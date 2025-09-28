@@ -162,9 +162,8 @@ private:
     std::string name_;
     Roads roads_;
     Buildings buildings_;
-
-    OfficeIdToIndex warehouse_id_to_index_;
     Offices offices_;
+    OfficeIdToIndex office_id_to_index_;  
 };
 
 class Game {
