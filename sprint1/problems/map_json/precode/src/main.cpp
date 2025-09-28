@@ -35,7 +35,8 @@ int main(int argc, const char* argv[]) {
     
     try {
         model::Game game = json_loader::LoadGame(argv[1]);
-        const unsigned num_threads = std::thread::hardware_concurrency();
+        
+        const unsigned num_threads = std::max(1u, std::thread::hardware_concurrency());
         net::io_context ioc(num_threads);
 
         net::signal_set signals(ioc, SIGINT, SIGTERM);
@@ -56,12 +57,17 @@ int main(int argc, const char* argv[]) {
         });
 
         std::cout << "Server has started..."sv << std::endl;
-
+        std::cout << "Listening on " << address << ":" << port << std::endl;
+        std::cout << "Using " << num_threads << " threads" << std::endl;
         RunWorkers(std::max(1u, num_threads), [&ioc] {
             ioc.run();
         });
+        
+        std::cout << "Server shutdown complete" << std::endl;
     } catch (const std::exception& ex) {
-        std::cerr << ex.what() << std::endl;
+        std::cerr << "Fatal error: " << ex.what() << std::endl;
         return EXIT_FAILURE;
     }
+    
+    return EXIT_SUCCESS;
 }
