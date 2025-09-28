@@ -9,6 +9,9 @@ Session::Session(tcp::socket&& socket, RequestHandler&& handler)
 }
 
 void Session::Run() {
+    // Устанавливаем TCP_NODELAY для лучшей производительности
+    stream_.socket().set_option(boost::asio::ip::tcp::no_delay(true));
+    
     Read();
 }
 
@@ -53,10 +56,11 @@ void Session::OnWrite(beast::error_code ec, std::size_t bytes_transferred, bool 
 
 Listener::Listener(net::io_context& ioc, tcp::endpoint endpoint, RequestHandler&& handler)
     : ioc_(ioc)
-    , acceptor_(ioc)
+    , acceptor_(net::make_strand(ioc))
     , handler_(std::move(handler)) {
     
     beast::error_code ec;
+    
     acceptor_.open(endpoint.protocol(), ec);
     if (ec) {
         throw std::runtime_error("Open error: " + ec.message());
@@ -102,4 +106,4 @@ void ServeHttp(net::io_context& ioc, const tcp::endpoint& endpoint, RequestHandl
     std::make_shared<Listener>(ioc, endpoint, std::move(handler))->Run();
 }
 
-} 
+}  // namespace http_server
