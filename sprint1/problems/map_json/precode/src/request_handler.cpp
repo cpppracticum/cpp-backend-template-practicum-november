@@ -10,7 +10,6 @@ namespace json = boost::json;
 
 namespace {
 
-// Функция для создания JSON-ответа с ошибкой
 http::response<http::string_body> MakeErrorResponse(http::status status, 
                                                    std::string code, 
                                                    std::string message) {
@@ -26,7 +25,6 @@ http::response<http::string_body> MakeErrorResponse(http::status status,
     return response;
 }
 
-// Функция для извлечения ID карты из пути
 std::string ExtractMapId(std::string_view path) {
     const std::string prefix = "/api/v1/maps/";
     if (path.size() <= prefix.size()) {
@@ -104,7 +102,6 @@ void RequestHandler::HandleGetMap(http::request<Body, http::basic_fields<Allocat
     map_json["id"] = *map->GetId();
     map_json["name"] = map->GetName();
     
-    // Добавляем дороги
     json::array roads_json;
     for (const auto& road : map->GetRoads()) {
         json::object road_json;
@@ -121,7 +118,6 @@ void RequestHandler::HandleGetMap(http::request<Body, http::basic_fields<Allocat
     }
     map_json["roads"] = roads_json;
     
-    // Добавляем здания
     json::array buildings_json;
     for (const auto& building : map->GetBuildings()) {
         json::object building_json;
@@ -134,7 +130,6 @@ void RequestHandler::HandleGetMap(http::request<Body, http::basic_fields<Allocat
     }
     map_json["buildings"] = buildings_json;
     
-    // Добавляем офисы
     json::array offices_json;
     for (const auto& office : map->GetOffices()) {
         json::object office_json;
