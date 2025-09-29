@@ -9,7 +9,6 @@ Session::Session(tcp::socket&& socket, RequestHandler&& handler)
 }
 
 void Session::Run() {
-    // Устанавливаем TCP_NODELAY для лучшей производительности
     stream_.socket().set_option(boost::asio::ip::tcp::no_delay(true));
     
     Read();
