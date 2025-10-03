@@ -47,7 +47,6 @@ std::string ExtractMapId(std::string_view path) {
     return map_id;
 }
 
-// Функции сериализации отдельных компонентов карты
 
 json::object SerializeRoad(const model::Road& road) {
     json::object road_json;
@@ -119,7 +118,6 @@ json::object SerializeMap(const model::Map& map) {
 
 }  // namespace
 
-// Реализации методов класса RequestHandler
 
 template <typename Body, typename Allocator, typename Send>
 void RequestHandler::operator()(http::request<Body, http::basic_fields<Allocator>>&& req, Send&& send) {
