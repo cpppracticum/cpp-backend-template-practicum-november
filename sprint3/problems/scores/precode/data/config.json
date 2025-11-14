@@ -1,3 +1,4 @@
+
 {
   "defaultDogSpeed": 3.0,
   "lootGeneratorConfig": {
@@ -337,4 +338,5 @@
       ]
     }
   ]
+
 }
