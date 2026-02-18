@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-22.04
     container:
       image: praktikumcpp/practicum_cpp_backend:latest
+      env:
+        DOCKER_API_VERSION: "1.44"
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
       options: --name main-container
@@ -82,6 +84,8 @@ jobs:
     runs-on: ubuntu-22.04
     container:
       image: praktikumcpp/practicum_cpp_backend:latest
+      env:
+        DOCKER_API_VERSION: "1.44"
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
       options: --name main-container
@@ -288,6 +292,8 @@ jobs:
     runs-on: ubuntu-22.04
     container:
       image: praktikumcpp/practicum_cpp_backend_server:latest
+      env:
+        DOCKER_API_VERSION: "1.44"
       options: --privileged
     services:
       cppserver:
@@ -331,6 +337,8 @@ jobs:
     runs-on: ubuntu-22.04
     container:
       image: praktikumcpp/practicum_cpp_backend:latest
+      env:
+        DOCKER_API_VERSION: "1.44"
       volumes:
         - /var/run/docker.sock:/var/run/docker.sock
       options: --name main-container
