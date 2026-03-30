@@ -1,65 +1,32 @@
 #pragma once
+
 #include <compare>
+#include <functional>
+#include <string>
 
 namespace util {
 
-/**
- * Вспомогательный шаблонный класс "Маркированный тип".
- * С его помощью можно описать строгий тип на основе другого типа.
- * Пример:
- *
- *  struct AddressTag{}; // метка типа для строки, хранящей адрес
- *  using Address = util::Tagged<std::string, AddressTag>;
- *
- *  struct NameTag{}; // метка типа для строки, хранящей имя
- *  using Name = util::Tagged<std::string, NameTag>;
- *
- *  struct Person {
- *      Name name;
- *      Address address;
- *  };
- *
- *  Name name{"Harry Potter"s};
- *  Address address{"4 Privet Drive, Little Whinging, Surrey, England"s};
- *
- * Person p1{name, address}; // OK
- * Person p2{address, name}; // Ошибка, Address и Name - разные типы
- */
 template <typename Value, typename Tag>
 class Tagged {
 public:
-    using ValueType = Value;
-    using TagType = Tag;
+    using value_type = Value;
 
-    explicit Tagged(Value&& v)
-        : value_(std::move(v)) {
-    }
-    explicit Tagged(const Value& v)
-        : value_(v) {
-    }
+    explicit Tagged(Value value) : value_(std::move(value)) {}
 
-    const Value& operator*() const {
-        return value_;
-    }
+    const Value& operator*() const { return value_; }
+    const Value* operator->() const { return &value_; }
 
-    Value& operator*() {
-        return value_;
-    }
-
-    // Так в C++20 можно объявить оператор сравнения Tagged-типов
-    // Будет просто вызван соответствующий оператор для поля value_
-    auto operator<=>(const Tagged<Value, Tag>&) const = default;
+    friend bool operator==(const Tagged& lhs, const Tagged& rhs) { return lhs.value_ == rhs.value_; }
+    friend std::strong_ordering operator<=>(const Tagged& lhs, const Tagged& rhs) { return lhs.value_ <=> rhs.value_; }
 
 private:
     Value value_;
 };
 
-// Хешер для Tagged-типа, чтобы Tagged-объекты можно было хранить в unordered-контейнерах
-template <typename TaggedValue>
+template <typename Tagged>
 struct TaggedHasher {
-    size_t operator()(const TaggedValue& value) const {
-        // Возвращает хеш значения, хранящегося внутри value
-        return std::hash<typename TaggedValue::ValueType>{}(*value);
+    size_t operator()(const Tagged& tagged) const {
+        return std::hash<typename Tagged::value_type>{}(*tagged);
     }
 };
 
