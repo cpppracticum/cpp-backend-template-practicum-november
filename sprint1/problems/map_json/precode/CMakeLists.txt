@@ -11,7 +11,7 @@ if(EXISTS ${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
     conan_basic_setup()
 endif()
 
-# Добавляем исполняемый файл (только .cpp файлы, .h подключаются автоматически)
+# Добавляем исполняемый файл
 add_executable(game_server
     src/main.cpp
     src/json_loader.cpp
@@ -25,6 +25,11 @@ target_include_directories(game_server PRIVATE src)
 # Для Windows добавляем библиотеку ws2_32
 if(WIN32)
     target_link_libraries(game_server ws2_32 wsock32)
+endif()
+
+# Для Linux добавляем библиотеку pthread
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    target_link_libraries(game_server pthread)
 endif()
 
 # Если не используем Conan, ищем Boost вручную
