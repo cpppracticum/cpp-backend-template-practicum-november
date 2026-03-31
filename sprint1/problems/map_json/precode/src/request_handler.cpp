@@ -1,142 +1,125 @@
 #include "request_handler.h"
 
-#include <boost/beast/http.hpp>
-#include <boost/json.hpp>
+#include <sstream>
 #include <iostream>
 
-namespace http_handler {
+#include <boost/json.hpp>
 
-namespace beast = boost::beast;
-namespace http = beast::http;
+#include "constants.h"
+#include "model/game.h"
+#include "model/map.h"
+
 namespace json = boost::json;
 
-void RequestHandler::operator()(http::request<http::string_body>&& req, std::function<void(http::response<http::string_body>&&)>&& send) {
-    std::string target(req.target().data(), req.target().size());
-    std::cout << "=== Request received ===" << std::endl;
-    std::cout << "Target: " << target << std::endl;
-    
-    http::response<http::string_body> response;
-    
-    if (target == "/api/v1/maps") {
-        response = HandleMapsRequest();
-    }
-    else if (target.size() > 13 && target.substr(0, 13) == "/api/v1/maps/") {
-        std::string map_id = target.substr(13);
-        response = HandleMapRequest(map_id);
-    }
-    else if (target.size() >= 4 && target.substr(0, 4) == "/api") {
-        response = MakeErrorResponse(http::status::bad_request, "badRequest", "Bad request");
-    }
-    else {
-        response = MakeErrorResponse(http::status::not_found, "notFound", "Not found");
-    }
-    
-    send(std::move(response));
-}
-
-http::response<http::string_body> RequestHandler::HandleMapsRequest() {
-    json::array maps_array;
-    
-    for (const auto& map : game_.GetMaps()) {
-        json::object map_obj;
-        map_obj["id"] = *map.GetId();
-        map_obj["name"] = map.GetName();
-        maps_array.push_back(std::move(map_obj));
-    }
-    
-    std::string body = json::serialize(maps_array);
-    
-    http::response<http::string_body> response(http::status::ok, 11);
-    response.set(http::field::content_type, "application/json");
-    response.body() = body;
-    response.content_length(body.size());
-    response.keep_alive(false);
-    
-    return response;
-}
-
-http::response<http::string_body> RequestHandler::HandleMapRequest(const std::string& map_id_str) {
-    model::Map::Id map_id(map_id_str);
-    const model::Map* map = game_.FindMap(map_id);
-    
-    if (!map) {
-        return MakeErrorResponse(http::status::not_found, "mapNotFound", "Map not found");
-    }
-    
-    json::object map_obj;
-    map_obj["id"] = *map->GetId();
-    map_obj["name"] = map->GetName();
-    
-    json::array roads_array;
-    for (const auto& road : map->GetRoads()) {
+// Вспомогательные функции для сериализации
+json::array SerializeRoads(const std::vector<model::Road>& roads) {
+    json::array result;
+    for (const auto& road : roads) {
         json::object road_obj;
-        auto start = road.GetStart();
-        auto end = road.GetEnd();
-        road_obj["x0"] = start.x;
-        road_obj["y0"] = start.y;
+        road_obj["x0"] = road.GetStart().x;
+        road_obj["y0"] = road.GetStart().y;
         
-        if (road.IsHorizontal()) {
-            road_obj["x1"] = end.x;
+        if (road.GetType() == model::Road::Horizontal) {
+            road_obj["x1"] = road.GetEnd().x;
         } else {
-            road_obj["y1"] = end.y;
+            road_obj["y1"] = road.GetEnd().y;
         }
-        roads_array.push_back(std::move(road_obj));
+        
+        result.push_back(std::move(road_obj));
     }
-    map_obj["roads"] = std::move(roads_array);
-    
-    json::array buildings_array;
-    for (const auto& building : map->GetBuildings()) {
-        auto bounds = building.GetBounds();
+    return result;
+}
+
+json::array SerializeBuildings(const std::vector<model::Building>& buildings) {
+    json::array result;
+    for (const auto& building : buildings) {
+        const auto& rect = building.GetBounds();
         json::object building_obj;
-        building_obj["x"] = bounds.position.x;
-        building_obj["y"] = bounds.position.y;
-        building_obj["w"] = bounds.size.width;
-        building_obj["h"] = bounds.size.height;
-        buildings_array.push_back(std::move(building_obj));
+        building_obj["x"] = rect.x;
+        building_obj["y"] = rect.y;
+        building_obj["w"] = rect.w;
+        building_obj["h"] = rect.h;
+        result.push_back(std::move(building_obj));
     }
-    map_obj["buildings"] = std::move(buildings_array);
-    
-    json::array offices_array;
-    for (const auto& office : map->GetOffices()) {
+    return result;
+}
+
+json::array SerializeOffices(const std::vector<model::Office>& offices) {
+    json::array result;
+    for (const auto& office : offices) {
         json::object office_obj;
-        office_obj["id"] = *office.GetId();
+        office_obj["id"] = office.GetId();
         office_obj["x"] = office.GetPosition().x;
         office_obj["y"] = office.GetPosition().y;
-        office_obj["offsetX"] = office.GetOffset().dx;
-        office_obj["offsetY"] = office.GetOffset().dy;
-        offices_array.push_back(std::move(office_obj));
+        office_obj["offsetX"] = office.GetOffset().x;
+        office_obj["offsetY"] = office.GetOffset().y;
+        result.push_back(std::move(office_obj));
     }
-    map_obj["offices"] = std::move(offices_array);
+    return result;
+}
+
+// Основной обработчик запросов
+http::response<http::string_body> HandleRequest(
+    const http::request<http::string_body>& req,
+    const model::Game& game) {
     
-    std::string body = json::serialize(map_obj);
-    
-    http::response<http::string_body> response(http::status::ok, 11);
-    response.set(http::field::content_type, "application/json");
-    response.body() = body;
-    response.content_length(body.size());
+    http::response<http::string_body> response;
+    response.version(req.version());
     response.keep_alive(false);
+    
+    std::string target(req.target());
+    
+    // Обработка эндпоинта /api/v1/maps
+    if (target == endpoints::MAPS) {
+        json::array maps_array;
+        
+        for (const auto& map : game.GetMaps()) {
+            json::object map_obj;
+            map_obj["id"] = map.GetId();
+            map_obj["name"] = map.GetName();
+            maps_array.push_back(std::move(map_obj));
+        }
+        
+        response.result(http::status::ok);
+        response.set(http::field::content_type, "application/json");
+        response.body() = json::serialize(maps_array);
+    }
+    // Обработка эндпоинта /api/v1/maps/{id}
+    else if (target.starts_with(endpoints::MAP_BY_ID)) {
+        std::string map_id = target.substr(endpoints::MAP_BY_ID.size());
+        const model::Map* found_map = nullptr;
+        
+        for (const auto& map : game.GetMaps()) {
+            if (map.GetId() == map_id) {
+                found_map = &map;
+                break;
+            }
+        }
+        
+        if (!found_map) {
+            response.result(http::status::not_found);
+            response.body() = R"({"code":"mapNotFound","message":"Map not found"})";
+        } else {
+            json::object map_obj;
+            map_obj["id"] = found_map->GetId();
+            map_obj["name"] = found_map->GetName();
+            map_obj["roads"] = SerializeRoads(found_map->GetRoads());
+            map_obj["buildings"] = SerializeBuildings(found_map->GetBuildings());
+            map_obj["offices"] = SerializeOffices(found_map->GetOffices());
+            
+            response.result(http::status::ok);
+            response.set(http::field::content_type, "application/json");
+            response.body() = json::serialize(map_obj);
+        }
+    }
+    // Неизвестный эндпоинт
+    else {
+        response.result(http::status::not_found);
+        response.body() = R"({"code":"notFound","message":"Endpoint not found"})";
+    }
+    
+    response.set(http::field::content_length, response.body().size());
+    response.prepare_payload();
     
     return response;
 }
-
-http::response<http::string_body> RequestHandler::MakeErrorResponse(
-    http::status status, 
-    const std::string& code, 
-    const std::string& message) {
-    
-    json::object error_obj;
-    error_obj["code"] = code;
-    error_obj["message"] = message;
-    
-    std::string body = json::serialize(error_obj);
-    
-    http::response<http::string_body> response(status, 11);
-    response.set(http::field::content_type, "application/json");
-    response.body() = body;
-    response.content_length(body.size());
-    response.keep_alive(false);
-    
-    return response;
-}
-
-} // namespace http_handler

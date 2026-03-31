@@ -17,6 +17,7 @@ add_executable(game_server
     src/json_loader.cpp
     src/request_handler.cpp
     src/model.cpp
+    src/http_server.cpp
 )
 
 # Подключаем заголовочные файлы
